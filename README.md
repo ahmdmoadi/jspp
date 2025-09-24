@@ -64,10 +64,14 @@ Boolean:
 ### Pointers?!
 Pointers are now more readable:
 ```c
-int pointer bf = addressat brainf;
+int a = 55;
+int pointer p = addressat a;
 // equiv to:
-int* bf = &brainf;
+int* p = &brainf;
 // ^also allowed
+
+// accessing pointers
+console.log(a === *p); // true
 ```
 ### Who tf cares about security? bruh
 total control is more important.
