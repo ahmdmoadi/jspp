@@ -25,7 +25,8 @@ export const tokenTypes = [
      'string', 'keyword', 'number', 'regexp',
       'operator', 'storage_type_t', 'keyword_operator_new_t',
      'string_regexp_t', "keyword_control_t",
-     "punctuation_definition_string_t"] as const;
+     "punctuation_definition_string_t",
+     'regex_flags_t'] as const;
 
 export type VSC_JSPPTokenType = typeof tokenTypes[number];
 
