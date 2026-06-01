@@ -24,6 +24,10 @@ function tokenize(input: string): JSPPToken[] {
      let currentLine = 0;
      let currentChar = 0;
 
+     let lines = () => {
+          return input.split("\n");
+     }
+
      while (i < input.length) {
           let char = input[i];
 
@@ -111,13 +115,17 @@ function tokenize(input: string): JSPPToken[] {
                         currentChar += 2;
                         continue;
                     }
+
+                    if(input[i] === quoteChar) break;
+                    
                     i++;
                     currentChar++;
-                    if(input[i] === quoteChar) break;
                }
 
                if (i >= input.length) {
-                    throw new SyntaxError(`Unterminated string literal starting at index ${start}`);
+                    let fetchdLine = lines()[currentLine];
+                    let str = `${fetchdLine.substring(start,fetchdLine.length)}`
+                    throw new SyntaxError(`Unterminated string literal starting at index ${start}\n${str}`);
                }
 
                i++; // Skip closing quote

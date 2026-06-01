@@ -46,6 +46,9 @@ function tokenize(input) {
     let i = 0;
     let currentLine = 0;
     let currentChar = 0;
+    let lines = () => {
+        return input.split("\n");
+    };
     while (i < input.length) {
         let char = input[i];
         // ignore comments
@@ -135,7 +138,8 @@ function tokenize(input) {
                     break;
             }
             if (i >= input.length) {
-                throw new SyntaxError(`Unterminated string literal starting at index ${start}`);
+                let str = `${lines()[currentLine]}\n${" ".repeat((start - 1) > -1 ? start - 1 : 0)}^`;
+                console.error(`Unterminated string literal starting at index ${start}\n${str}`);
             }
             i++; // Skip closing quote
             currentChar++;
