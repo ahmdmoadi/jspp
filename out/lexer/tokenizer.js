@@ -222,64 +222,70 @@ const node_1 = require("vscode-languageserver/node");
 function build_vscode_tokens(input) {
     const tokens = tokenize(input);
     const builder = new node_1.SemanticTokensBuilder();
+    // --- PASS 1: Build the Symbol Table (Cache) ---
+    // (Now properly OUTSIDE the main loop!)
+    const knownClasses = new Set();
+    for (let j = 0; j < tokens.length - 1; j++) {
+        // If we see 'class' followed by an identifier, memorize it!
+        if (tokens[j].text === "class" && tokens[j + 1].type === "IDENTIFIER") {
+            knownClasses.add(tokens[j + 1].text);
+        }
+    }
+    // --- PASS 2: Assign Colors ---
     for (let i = 0; i < tokens.length; i++) {
         let token = tokens[i];
         let vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("operator");
-        // --- PASS 1: Build the Symbol Table (Cache) ---
-        const knownClasses = new Set();
-        for (let i = 0; i < tokens.length - 1; i++) {
-            // If we see 'class' followed by an identifier, memorize it!
-            if (tokens[i].text === "class" && tokens[i + 1].type === "IDENTIFIER") {
-                knownClasses.add(tokens[i + 1].text);
-            }
-        }
-        if (token.type === "KEYWORD" /**&& token.text === "int"*/) { // hightlight keywords >function< dbl(){}
+        if (token.type === "KEYWORD") {
             (token.text === "new") ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword_operator_new_t") :
                 (tokenizer_types_js_1.keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword_control_t") :
                     vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("storage_type_t");
         }
-        else if (token.type === "IDENTIFIER") { // highlight identifiers (e.g. int >number< = 0;)
+        else if (token.type === "IDENTIFIER") {
             let afternew = i > 0 ? tokens[i - 1].text === "new" : null;
             let funciden = i > 0 ? tokens[i - 1].text === "function" : null;
             (afternew) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("class") :
                 (knownClasses.has(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("class") :
                     (funciden) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("function") :
-                        (i < tokens.length && tokens[i + 1].text === "(") ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("function") :
+                        (i < tokens.length - 1 && tokens[i + 1].text === "(") ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("function") :
                             (tokenizer_types_js_1.keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword_control_t") :
                                 (tokenizer_types_js_1.storage_type_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("storage_type_t") :
                                     vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("variable");
-            // throw new EvalError(`Error: Unmapped token type ${token.type}!`)
         }
         else if (token.type === "STRING") {
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("string");
         }
-        else if (token.type === "NUMBER") { // highlight numbers >99<
+        else if (token.type === "NUMBER") {
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("number");
-            // FLAG REGEX
         }
         else if (token.type === "REGEX") {
-            // handle lhs fwd slash
+            let lastSlash = token.text.lastIndexOf("/");
+            // 1. handle lhs fwd slash
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("punctuation_definition_string_t");
-            builder.push(token.line, token.text.indexOf("/"), 1, vsc_type_idx, 0);
-            // handle regex expression
-            vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("string_regexp_t");
-            let regexText = token.text.substring(token.text.indexOf("/") + 1, token.text.lastIndexOf("/"));
-            builder.push(token.line, token.text.indexOf("/") + 1, regexText.length, vsc_type_idx, 0);
-            // handle rhs fwd slash
+            builder.push(token.line, token.char, 1, vsc_type_idx, 0);
+            // 2. handle regex expression
+            let bodyLength = lastSlash - 1;
+            if (bodyLength > 0) {
+                vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("string_regexp_t");
+                builder.push(token.line, token.char + 1, bodyLength, vsc_type_idx, 0);
+            }
+            // 3. handle rhs fwd slash
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("punctuation_definition_string_t");
-            builder.push(token.line, token.text.lastIndexOf("/"), 1, vsc_type_idx, 0);
-            // handle regex flags
-            let ss = token.text.substring(token.text.lastIndexOf("/") + 1, token.text.length);
-            vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("regex_flags_t");
-            builder.push(token.line, token.text.lastIndexOf("/") + 1, ss.length, vsc_type_idx, 0);
+            builder.push(token.line, token.char + lastSlash, 1, vsc_type_idx, 0);
+            // 4. handle regex flags (Fallback to keyword)
+            let flagsLength = token.text.length - (lastSlash + 1);
+            if (flagsLength > 0) {
+                vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword");
+                builder.push(token.line, token.char + lastSlash + 1, flagsLength, vsc_type_idx, 0);
+            }
+            // BOOM. Skip the catch-all push at the bottom!
+            continue;
         }
-        else { // fallback
+        else {
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("operator");
         }
-        let { type, text, line, char } = token;
-        builder.push(line, char, text.length, vsc_type_idx, 0);
+        // The catch-all push for everything else
+        builder.push(token.line, token.char, token.text.length, vsc_type_idx, 0);
     }
-    printlogs();
     return builder.build();
 }
 function addlog(...args) {

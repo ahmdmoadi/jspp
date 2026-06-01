@@ -262,10 +262,9 @@ export function build_vscode_tokens(input: string) {
           } else if(token.type === "NUMBER") { 
                vsc_type_idx = tokenTypes.indexOf("number");
           } else if(token.type === "REGEX") {
-
                let lastSlash = token.text.lastIndexOf("/");
 
-               // 1. handle lhs fwd slash (using absolute token.char!)
+               // 1. handle lhs fwd slash
                vsc_type_idx = tokenTypes.indexOf("punctuation_definition_string_t");
                builder.push(token.line, token.char, 1, vsc_type_idx, 0);
 
@@ -280,18 +279,20 @@ export function build_vscode_tokens(input: string) {
                vsc_type_idx = tokenTypes.indexOf("punctuation_definition_string_t");
                builder.push(token.line, token.char + lastSlash, 1, vsc_type_idx, 0);
 
-               // 4. handle regex flags (Fallback to keyword safely)
+               // 4. handle regex flags (Fallback to keyword)
                let flagsLength = token.text.length - (lastSlash + 1);
                if (flagsLength > 0) {
                    vsc_type_idx = tokenTypes.indexOf("keyword");
                    builder.push(token.line, token.char + lastSlash + 1, flagsLength, vsc_type_idx, 0);
                }
-               continue;
+               
+               // BOOM. Skip the catch-all push at the bottom!
+               continue; 
           } else { 
                vsc_type_idx = tokenTypes.indexOf("operator");
           }
           
-          // Push the token ONLY IF it wasn't already pushed by the Regex block
+          // The catch-all push for everything else
           builder.push(token.line, token.char, token.text.length, vsc_type_idx, 0);
      }
      
