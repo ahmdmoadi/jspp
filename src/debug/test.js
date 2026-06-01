@@ -1,5 +1,4 @@
 import { tokenize } from '../lexer/tokenizer';
-// import chalk from 'chalk';
 
 let input = `/regexp/igmsuy
 
@@ -11,4 +10,4 @@ class Person {
      public string name = "";
 }`;
 
-console.log(`Input: "${input}\nOutput:\ns`,tokenize(input));
+console.log(`Output:\ns`,tokenize(input));
