@@ -25,7 +25,8 @@ exports.keyword_control_t = [
     "for", "if", "else", "loop",
     "return", "import", "export",
     "with", "forevery", "do",
-    "break", "while"
+    "break", "while", "async",
+    "await", "continue",
 ];
 exports.storage_type_t = [
     "const", "let", "int", "float", "char", "void", "class",

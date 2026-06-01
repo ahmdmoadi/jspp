@@ -14,6 +14,7 @@ let keywords = [
     "var",
     "const",
     "int", // 4byte / 32 bit integer
+    "string",
     "unsigned",
     "function", // function functName(void?) {} same as void functName(void?) {}
     "void",
@@ -31,7 +32,10 @@ let keywords = [
     "private",
     "new",
     "class",
-    "return"
+    "return",
+    "public",
+    "async",
+    "await"
 ];
 exports.keywords = keywords;
 let rel_int = {

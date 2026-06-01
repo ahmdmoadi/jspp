@@ -14,6 +14,8 @@ let accum_logs: any[] = [];
 
 function tokenize(input: string): JSPPToken[] {
 
+     accum_logs = []; // empty debug arr
+
      input = input.replace(/\r\n/g, "\n");
 
      // let lines = input.split("\n");
@@ -61,7 +63,7 @@ function tokenize(input: string): JSPPToken[] {
           }
 
           if (/^\d/.test(char)) {
-               const start = i;
+               const start = i; 
                const startChar = currentChar;
                while (i < input.length && /\d|\./.test(input[i])) {
                     i++;
@@ -117,7 +119,7 @@ function tokenize(input: string): JSPPToken[] {
                     }
 
                     if(input[i] === quoteChar) break;
-                    
+
                     i++;
                     currentChar++;
                }
@@ -125,7 +127,7 @@ function tokenize(input: string): JSPPToken[] {
                if (i >= input.length) {
                     let fetchdLine = lines()[currentLine];
                     let str = `${fetchdLine.substring(start,fetchdLine.length)}`
-                    throw new SyntaxError(`Unterminated string literal starting at index ${start}\n${str}`);
+                    accum_logs.push(`Unterminated string literal starting at index ${start}\n${str}`);
                }
 
                i++; // Skip closing quote
@@ -212,91 +214,87 @@ function tokenize(input: string): JSPPToken[] {
           i++;
           currentChar++;
      }
+     printlogs();
      return tokens;
 }
 //FLAG:SEPERATE:0
 import { SemanticTokensBuilder } from 'vscode-languageserver/node';
 
 export function build_vscode_tokens(input: string) {
-
      const tokens = tokenize(input);
-
      const builder = new SemanticTokensBuilder();
 
-     for(let i=0;i<tokens.length;i++) {
-          let token = tokens[i];
+     // --- PASS 1: Build the Symbol Table (Cache) ---
+     // (Now properly OUTSIDE the main loop!)
+     const knownClasses = new Set<string>();
+     
+     for (let j = 0; j < tokens.length - 1; j++) {
+          // If we see 'class' followed by an identifier, memorize it!
+          if (tokens[j].text === "class" && tokens[j+1].type === "IDENTIFIER") {
+               knownClasses.add(tokens[j+1].text);
+          }
+     }
 
+     // --- PASS 2: Assign Colors ---
+     for(let i=0; i<tokens.length; i++) {
+          let token = tokens[i];
           let vsc_type_idx = tokenTypes.indexOf("operator");
 
-          // --- PASS 1: Build the Symbol Table (Cache) ---
-          const knownClasses = new Set<string>();
-          
-          for (let i = 0; i < tokens.length - 1; i++) {
-               // If we see 'class' followed by an identifier, memorize it!
-               if (tokens[i].text === "class" && tokens[i+1].type === "IDENTIFIER") {
-                    knownClasses.add(tokens[i+1].text);
-               }
-          }
-
-          if (token.type === "KEYWORD"/**&& token.text === "int"*/) { // hightlight keywords >function< dbl(){}
+          if (token.type === "KEYWORD") { 
                (token.text === "new") ? vsc_type_idx = tokenTypes.indexOf("keyword_operator_new_t") :
                (keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenTypes.indexOf("keyword_control_t") :
                vsc_type_idx = tokenTypes.indexOf("storage_type_t");
 
-          } else if(token.type === "IDENTIFIER") { // highlight identifiers (e.g. int >number< = 0;)
+          } else if(token.type === "IDENTIFIER") { 
                let afternew = i>0 ? tokens[i-1].text === "new" : null;
                let funciden = i>0 ? tokens[i-1].text === "function" : null;
+               
                (afternew) ? vsc_type_idx = tokenTypes.indexOf("class") :
                (knownClasses.has(token.text)) ? vsc_type_idx = tokenTypes.indexOf("class") :
                (funciden) ? vsc_type_idx = tokenTypes.indexOf("function") :
+               (i<tokens.length-1 && tokens[i+1].text === "(") ? vsc_type_idx = tokenTypes.indexOf("function") :
                (keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenTypes.indexOf("keyword_control_t") :
                (storage_type_t.includes(token.text))?vsc_type_idx = tokenTypes.indexOf("storage_type_t"):
                vsc_type_idx = tokenTypes.indexOf("variable");
-               // throw new EvalError(`Error: Unmapped token type ${token.type}!`)
 
           } else if (token.type === "STRING") {
                vsc_type_idx = tokenTypes.indexOf("string");
-          } else if(token.type === "NUMBER") { // highlight numbers >99<
-
+          } else if(token.type === "NUMBER") { 
                vsc_type_idx = tokenTypes.indexOf("number");
-
-               // FLAG REGEX
           } else if(token.type === "REGEX") {
-               // addlog(token.text);
-               accum_logs = [];
-               let arr: any[] = [];
 
-               // handle lhs fwd slash
+               let lastSlash = token.text.lastIndexOf("/");
+
+               // 1. handle lhs fwd slash (using absolute token.char!)
                vsc_type_idx = tokenTypes.indexOf("punctuation_definition_string_t");
-               builder.push(token.line, token.text.indexOf("/"), 1, vsc_type_idx, 0);
-               arr.push("/");
+               builder.push(token.line, token.char, 1, vsc_type_idx, 0);
 
-               // handle regex expression
-               vsc_type_idx = tokenTypes.indexOf("string_regexp_t");
-               let regexText = token.text.substring(token.text.indexOf("/")+1, token.text.lastIndexOf("/"));
-               builder.push(token.line, token.text.indexOf("/")+1, regexText.length, vsc_type_idx, 0);
-               arr.push(regexText);
+               // 2. handle regex expression
+               let bodyLength = lastSlash - 1;
+               if (bodyLength > 0) {
+                   vsc_type_idx = tokenTypes.indexOf("string_regexp_t");
+                   builder.push(token.line, token.char + 1, bodyLength, vsc_type_idx, 0);
+               }
 
-               // handle rhs fwd slash
+               // 3. handle rhs fwd slash
                vsc_type_idx = tokenTypes.indexOf("punctuation_definition_string_t");
-               builder.push(token.line, token.text.lastIndexOf("/"), 1, vsc_type_idx, 0);
-               arr.push("/")
+               builder.push(token.line, token.char + lastSlash, 1, vsc_type_idx, 0);
 
-               // handle regex flags
-               let ss = token.text.substring(token.text.lastIndexOf("/")+1, token.text.length);
-               vsc_type_idx = tokenTypes.indexOf("regex_flags_t");
-               builder.push(token.line, token.text.lastIndexOf("/")+1, ss.length, vsc_type_idx, 0);
-               arr.push(ss);
-
-               accum_logs.push(arr);
-          } else { // fallback
+               // 4. handle regex flags (Fallback to keyword safely)
+               let flagsLength = token.text.length - (lastSlash + 1);
+               if (flagsLength > 0) {
+                   vsc_type_idx = tokenTypes.indexOf("keyword");
+                   builder.push(token.line, token.char + lastSlash + 1, flagsLength, vsc_type_idx, 0);
+               }
+               continue;
+          } else { 
                vsc_type_idx = tokenTypes.indexOf("operator");
-
           }
-          let { type, text, line, char } = token;
-          builder.push(line, char, text.length, vsc_type_idx, 0);
+          
+          // Push the token ONLY IF it wasn't already pushed by the Regex block
+          builder.push(token.line, token.char, token.text.length, vsc_type_idx, 0);
      }
-     printlogs();
+     
      return builder.build();
 }
 

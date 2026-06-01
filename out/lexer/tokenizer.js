@@ -40,6 +40,7 @@ const outline_js_1 = require("../outline.js");
 const tokenizer_types_js_1 = require("./tokenizer.types.js");
 let accum_logs = [];
 function tokenize(input) {
+    accum_logs = []; // empty debug arr
     input = input.replace(/\r\n/g, "\n");
     // let lines = input.split("\n");
     let tokens = [];
@@ -132,14 +133,15 @@ function tokenize(input) {
                     currentChar += 2;
                     continue;
                 }
-                i++;
-                currentChar++;
                 if (input[i] === quoteChar)
                     break;
+                i++;
+                currentChar++;
             }
             if (i >= input.length) {
-                let str = `${lines()[currentLine]}\n${" ".repeat((start - 1) > -1 ? start - 1 : 0)}^`;
-                console.error(`Unterminated string literal starting at index ${start}\n${str}`);
+                let fetchdLine = lines()[currentLine];
+                let str = `${fetchdLine.substring(start, fetchdLine.length)}`;
+                accum_logs.push(`Unterminated string literal starting at index ${start}\n${str}`);
             }
             i++; // Skip closing quote
             currentChar++;
@@ -212,6 +214,7 @@ function tokenize(input) {
         i++;
         currentChar++;
     }
+    printlogs();
     return tokens;
 }
 //FLAG:SEPERATE:0
@@ -241,9 +244,10 @@ function build_vscode_tokens(input) {
             (afternew) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("class") :
                 (knownClasses.has(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("class") :
                     (funciden) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("function") :
-                        (tokenizer_types_js_1.keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword_control_t") :
-                            (tokenizer_types_js_1.storage_type_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("storage_type_t") :
-                                vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("variable");
+                        (i < tokens.length && tokens[i + 1].text === "(") ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("function") :
+                            (tokenizer_types_js_1.keyword_control_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("keyword_control_t") :
+                                (tokenizer_types_js_1.storage_type_t.includes(token.text)) ? vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("storage_type_t") :
+                                    vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("variable");
             // throw new EvalError(`Error: Unmapped token type ${token.type}!`)
         }
         else if (token.type === "STRING") {
@@ -254,28 +258,20 @@ function build_vscode_tokens(input) {
             // FLAG REGEX
         }
         else if (token.type === "REGEX") {
-            // addlog(token.text);
-            accum_logs = [];
-            let arr = [];
             // handle lhs fwd slash
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("punctuation_definition_string_t");
             builder.push(token.line, token.text.indexOf("/"), 1, vsc_type_idx, 0);
-            arr.push("/");
             // handle regex expression
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("string_regexp_t");
             let regexText = token.text.substring(token.text.indexOf("/") + 1, token.text.lastIndexOf("/"));
             builder.push(token.line, token.text.indexOf("/") + 1, regexText.length, vsc_type_idx, 0);
-            arr.push(regexText);
             // handle rhs fwd slash
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("punctuation_definition_string_t");
             builder.push(token.line, token.text.lastIndexOf("/"), 1, vsc_type_idx, 0);
-            arr.push("/");
             // handle regex flags
             let ss = token.text.substring(token.text.lastIndexOf("/") + 1, token.text.length);
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("regex_flags_t");
             builder.push(token.line, token.text.lastIndexOf("/") + 1, ss.length, vsc_type_idx, 0);
-            arr.push(ss);
-            accum_logs.push(arr);
         }
         else { // fallback
             vsc_type_idx = tokenizer_types_js_1.tokenTypes.indexOf("operator");
