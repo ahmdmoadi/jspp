@@ -159,7 +159,46 @@ let rel_for = {
   "math_ineq_with_step": "for(1 <= int i <= 10; i+=3)", // if semicolon and wrong/no step then throws SyntaxError
 }
 
-let bucket_list = {
+let rel_class = {
+     "with_getter_setter": `
+     class Person {
+          public static int hijriDiff = 1; // bad approx. used only for demo purposes
+          public int age = 0;
+          string name = ""; // public by default.
+          constructor(string name, int age) {
+               this.name = name;
+               this.age = age;
+          }
+          set age(x) {
+               this.age = x;
+               return x;
+          }
+          get age {return age}
+          get hijriAge {return age+hijriDiff}
+     }
+     `,
+     "with_operator_overloading": `
+     class v2 {
+          int x = 0;
+          int y = 0;
+          constructor(...float numbers) {
+               if(numbers.length == 1) {
+                    this.x = numbers[0];
+                    this.y = numbers[0];
+               }
+          }
+          operator<*>(float scaler, uint8_t side) { // our side: 0=left 1=right
+              this.x *= other;
+              this.y *= other;
+          }
+          get xx() {
+               return vec2(this.x,this.x)
+          }
+     }
+     `
+}
+
+let future_bucket_list = {
      "idk": 'int() dbl = await extern "C" int() (x) `int`',
      "async": "await"
 }

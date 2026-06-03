@@ -246,6 +246,17 @@ export function build_vscode_tokens(input: string) {
                vsc_type_idx = tokenTypes.indexOf("storage_type_t");
 
           } else if(token.type === "IDENTIFIER") { 
+
+               // If the current token is "get" or "set"
+               if (token.text === "get" || token.text === "set") {
+               // Peek ahead to ensure it is immediately followed by a property name
+               if (i + 1 < tokens.length && tokens[i+1].type === "IDENTIFIER") {
+                    vsc_type_idx = tokenTypes.indexOf("storage_type_t"); 
+                    builder.push(token.line, token.char, token.text.length, vsc_type_idx, 0);
+                    continue;
+               }
+               }
+
                let afternew = i>0 ? tokens[i-1].text === "new" : null;
                let funciden = i>0 ? tokens[i-1].text === "function" : null;
                
