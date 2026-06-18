@@ -1,4 +1,9 @@
 "use strict";
+////////////////
+// outline.js //
+//////////////////////////////////////////
+// this file is used for notes/drafting //
+//////////////////////////////////////////
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.keywords = void 0;
 const input = "int varname = 2;";
@@ -44,9 +49,12 @@ let rel_int = {
     in_type_convertion: "int(10.23)"
 };
 let rel_pointer = {
-    in_var_defi: "pointer int numptr = &num;", // retain c syntax here
-    deref: "@numptr",
-    usage: "numptr" // it's not that deep
+    in_var_defi: "int* numptr = &num;", // retain c syntax here
+    in_var_defi_dont_like: "int *numptr = &num;", // warn for confusing syntax (-Wno-starstruck to silence)
+    in_var_defi2: "int* numptr = addressof num;",
+    deref1: "@numptr",
+    deref2: "*numptr", // also warn for confusing syntax and encourage using @ptr to deref (also -Wno-starstruck to silence)
+    deref_verbose: "at numptr",
 };
 let rel_char = {
     in_var_defi: "char a = 'a'; ", // single or dbl quotations marks don't matter.
@@ -148,7 +156,50 @@ let rel_for = {
     "math_ineq": "for(1 <= int i <= 10)", // by default i++ / i+=1;
     "math_ineq_with_step": "for(1 <= int i <= 10; i+=3)", // if semicolon and wrong/no step then throws SyntaxError
 };
-let bucket_list = {
+let rel_class = {
+    "with_getter_setter": `
+     class Person {
+          public static int hijriDiff = 1; // bad approx. used only for demo purposes
+          public int age = 0;
+          string name = ""; // public by default.
+          constructor(string name, int age) {
+               this.name = name;
+               this.age = age;
+          }
+          set age(x) {
+               this.age = x;
+               return x;
+          }
+          get age {return age}
+          get hijriAge {return age+hijriDiff}
+     }
+     `,
+    "with_operator_overloading": `
+     class v2 {
+          int x = 0;
+          int y = 0;
+          constructor(...float numbers) {
+               if(numbers.length == 1) {
+                    this.x = numbers[0];
+                    this.y = numbers[0];
+               }
+          }
+          // op. overl. below covers: 'pos * 3.0f'
+          operator<this*float>(float scaler) {
+               this.x *= scaler;
+               this.y *= scaler;
+          }
+          // op. overl. below covers: '3.0f * pos'
+          operator<float*this>(float scaler) {
+               throw new Error("Illegal order of expression. did you mean 'v2 * float' ?");
+          }
+          get xx() {
+               return vec2(this.x,this.x)
+          }
+     }
+     `
+};
+let future_bucket_list = {
     "idk": 'int() dbl = await extern "C" int() (x) `int`',
     "async": "await"
 };

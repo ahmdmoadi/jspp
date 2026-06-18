@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import { keywords } from '../outline.js';
 import { 
      JSPPToken,
      JSPPTokenType,
@@ -8,7 +7,8 @@ import {
      VSC_JSPPTokenType,
      keyword_control_t,
      storage_type_t,
-     multichar_ops
+     multichar_ops,
+     keywords
 } from './tokenizer.types.js';
 
 let accum_logs: any[] = [];

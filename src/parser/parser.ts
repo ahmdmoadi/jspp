@@ -1,4 +1,9 @@
 import { tokenize } from "../lexer/tokenizer";
+import {
+     JSPPToken,
+     JSPPTokenType,
+     inferrers
+} from "../lexer/tokenizer.types";
 
 let str = "int a = 1;";
 let currentPath = ["root"];
@@ -11,28 +16,85 @@ let ast_tree = {
 
 let base_types = ["int", "char", "float", "float", "double", "void"];
 
-parse(str);
+let tokens = tokenize(str)
 
-function parse(str: string) {
-     let tokens = tokenize(str);
-     
-     for (let i=0; i<tokens.length; i++) {
-          let current = tokens[i];
+parse(tokens);
 
-          function peek(distance: number = 1) { return tokens[i+distance]; }
-          function consume() { return tokens[++i]; }
+function parse(tokens: JSPPToken[]) {
+     let i = 0;
 
-          // int name() {}
-          if(
-               base_types.includes(current.text) &&
-               peek(1).type === "IDENTIFIER" &&
-               (peek(2).type === "SYMBOL" && peek(2).text === "(")
-          ) {
-               i += parse_function(tokens, i);
-          }
+     // peek tokens after w/o mutation
+     const peek    = (d = 0): JSPPToken => tokens[i + d];
+     // consume one token and advance 
+     const consume = (): JSPPToken => tokens[i++];
+     // expect X and cry if not X
+     const expect  = (type: JSPPTokenType, text?: string): JSPPToken => {
+          const t = consume();
+          if (t.type !== type || (text !== undefined && t.text !== text))
+               throw new Error(`[${t.line}:${t.char}] Expected ${text ?? type}, got '${t.text}'`);
+          return t;
+     };
+     // ??
+     const at = (type: JSPPTokenType, text?: string, d = 0): boolean => {
+          const t = peek(d);
+          return !!t && t.type === type && (text === undefined || t.text === text);
+     };
+
+     function parseTypedDecl() {
+          /* handles int, pointer int, int[], void(), Student[] ... */
+
+          /*
+          - base
+          int name = // integer
+          int() name // alternate function (lambda/anonymous) returning an integer
+          int name( // function returning an integer
+
+          - array related
+          int[] name = // integer array variable
+          int[]() name // alternate function (lambda/anonymous) retuning an integer array
+          int[] name( // function returning an integer array
+
+          - pointers definition
+          int* name = // pointer to integer
+          int *name = // == but warn with (-Wstarstruck)
+          */
      }
-}
+     function isTypeStart() {
+          return base_types.includes(peek().text);
+     }
+     function parseInferredDecl() {
+          /*
+          - Handeling Inferred Declaration
+          i need to vomit ideas then sort them 🤪
+          let a = ""; // primitive string or char[]
+          const a: string = "";
+          const a
+          */
+     }
+     function parseExpr() { /* handles precedence climbing for operators */ }
+     function parseReturn() {}
+     function parseClass() {}
+     function parseStatement() {
+          // let/var/const path
+          let compounded_or = true;
+          for(let inferrer of inferrers) {
+               compounded_or ||= at("KEYWORD", inferrer);
+          }
+          if (compounded_or) return parseInferredDecl();
 
-function parse_function(tokens: any[], i: number) {
-     return 0;
+          // return
+          if (at("KEYWORD", "return")) return parseReturn();
+
+          // class
+          if (at("KEYWORD", "class")) return parseClass();
+
+          // explicit type path: int x ... / void foo() {} / pointer int p ...
+          if (isTypeStart()) return parseTypedDecl(); // dispatches to var or function
+          
+          throw new Error(`[${peek().line}:${peek().char}] Unexpected '${peek().text}'`);
+     }
+
+     const ast = [];
+     while (i < tokens.length) ast.push(parseStatement());
+     return ast;
 }

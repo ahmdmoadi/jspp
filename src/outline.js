@@ -1,3 +1,9 @@
+////////////////
+// outline.js //
+//////////////////////////////////////////
+// this file is used for notes/drafting //
+//////////////////////////////////////////
+
 const input = "int varname = 2;";
 
 let typesizes_b = {
@@ -44,9 +50,12 @@ let rel_int = {
 };
 
 let rel_pointer = {
-     in_var_defi: "pointer int numptr = &num;", // retain c syntax here
-     deref: "@numptr",
-     usage: "numptr" // it's not that deep
+     in_var_defi: "int* numptr = &num;", // retain c syntax here
+     in_var_defi_dont_like: "int *numptr = &num;", // warn for confusing syntax (-Wno-starstruck to silence)
+     in_var_defi2: "int* numptr = addressof num;",
+     deref1: "@numptr",
+     deref2: "*numptr", // also warn for confusing syntax and encourage using @ptr to deref (also -Wno-starstruck to silence)
+     deref_verbose: "at numptr",
 }
 
 let rel_char = {
@@ -187,9 +196,14 @@ let rel_class = {
                     this.y = numbers[0];
                }
           }
-          operator<*>(float scaler, uint8_t side) { // our side: 0=left 1=right
-              this.x *= other;
-              this.y *= other;
+          // op. overl. below covers: 'pos * 3.0f'
+          operator<this*float>(float scaler) {
+               this.x *= scaler;
+               this.y *= scaler;
+          }
+          // op. overl. below covers: '3.0f * pos'
+          operator<float*this>(float scaler) {
+               throw new Error("Illegal order of expression. did you mean 'v2 * float' ?");
           }
           get xx() {
                return vec2(this.x,this.x)

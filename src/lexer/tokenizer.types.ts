@@ -37,21 +37,56 @@ export interface VSC_JSPPToken {
      line: number,
      char: number
 }
+
+export const keywords = [
+     "let", // dynamic/java "var" variable declaration. let
+     "var",
+     "const",
+     "int", // 4byte / 32 bit integer
+     "string",
+     "unsigned",
+     "function", // function functName(void?) {} same as void functName(void?) {}
+     "void",
+     "arguments",
+     "instanceof",
+     "delete",
+     "alloc",
+     "addressof",
+     "pointer",
+     "is",
+     "in",
+     "arguments",
+     "static",
+     "private",
+     "new",
+     "class",
+     "return",
+     "public",
+     "async",
+     "await",
+     "lazy"
+];
+
 export const keyword_control_t = [
      "for", "if", "else", "loop",
      "return", "import", "export",
      "with", "forevery", "do",
      "break", "while", "async",
-     "await", "continue",
+     "await", "continue", "at",
 ];
 
 export const storage_type_t = [
      "const", "let", "int", "float", "char", "void", "class",
-     "of", "in" // not really but like i dont give a fk about ts anyway, I just want it blue
+     "of", "in", // not really but like i dont give a fk about ts anyway, I just want it blue
+     "lazy"
 ];
 
 export const multichar_ops = [
     "===","!==","<<=",">>=",   // 3-char first
     "==","!=",">=","<=","&&","||","++","--",
     "+=","-=","*=","/=","%=","&=","|=","^=","<<",">>"
+];
+
+export const inferrers = [
+     "let", "var", "const", /* const only if like: `const name = "whatever"` */
 ];

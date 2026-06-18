@@ -36,7 +36,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.build_vscode_tokens = build_vscode_tokens;
 exports.tokenize = tokenize;
 const fs = __importStar(require("fs"));
-const outline_js_1 = require("../outline.js");
 const tokenizer_types_js_1 = require("./tokenizer.types.js");
 let accum_logs = [];
 function tokenize(input) {
@@ -78,12 +77,28 @@ function tokenize(input) {
             i++;
             continue;
         }
+        // handle numbers
         if (/^\d/.test(char)) {
             const start = i;
             const startChar = currentChar;
-            while (i < input.length && /\d|\./.test(input[i])) {
-                i++;
-                currentChar++;
+            // while (i < input.length && /\d|\./.test(input[i])) {
+            //      i++;
+            //      currentChar++;
+            // }
+            let hasDot = false;
+            while (i < input.length) {
+                if (/\d/.test(input[i])) {
+                    i++;
+                    currentChar++;
+                }
+                else if (input[i] === '.' && !hasDot) {
+                    hasDot = true;
+                    i++;
+                    currentChar++;
+                }
+                else {
+                    break;
+                }
             }
             tokens.push({
                 type: "NUMBER",
@@ -103,7 +118,7 @@ function tokenize(input) {
             }
             ;
             const text = input.substring(start, i);
-            if (outline_js_1.keywords.includes(text)) {
+            if (tokenizer_types_js_1.keywords.includes(text)) {
                 tokens.push({
                     type: "KEYWORD",
                     text,
@@ -121,6 +136,7 @@ function tokenize(input) {
             }
             continue;
         }
+        // handle strings
         if (char === '"' || char === "'") {
             const quoteChar = char;
             const start = i;
@@ -203,6 +219,14 @@ function tokenize(input) {
             }
             // If isDivision WAS true, we do absolutely nothing. 
             // The loop will just continue downward and hit your fallback SYMBOL pusher!
+        } // end regex
+        // match multi-character operations. (ft. claude sonnet 4.6 medium effort)
+        let matched = tokenizer_types_js_1.multichar_ops.find(op => input.startsWith(op, i)); //FLAG
+        if (matched) {
+            tokens.push({ type: "SYMBOL", text: matched, line: currentLine, char: currentChar });
+            i += matched.length;
+            currentChar += matched.length;
+            continue;
         }
         // catch-all swllowed as symbol
         tokens.push({
