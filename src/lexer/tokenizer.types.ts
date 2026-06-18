@@ -64,7 +64,8 @@ export const keywords = [
      "public",
      "async",
      "await",
-     "lazy"
+     "lazy",
+     "defer"
 ];
 
 export const keyword_control_t = [
@@ -73,6 +74,7 @@ export const keyword_control_t = [
      "with", "forevery", "do",
      "break", "while", "async",
      "await", "continue", "at",
+     "defer"
 ];
 
 export const storage_type_t = [

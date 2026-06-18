@@ -67,8 +67,16 @@ function parse(tokens: JSPPToken[]) {
           - Handeling Inferred Declaration
           i need to vomit ideas then sort them 🤪
           let a = ""; // primitive string or char[]
-          const a: string = "";
-          const a
+          const a = 9; // primitive int
+          let a = 9.; // primitive double
+          let a = 9d; // primitive double
+          let a = 9f; // primitive float
+          let a = true; // primitive bool
+          let a; // equiv to int a; or maybe should be size_t a?
+          a; // equiv to int a; self defining variables. // will error unless #cf:ii:on; is implied
+          // #cf:ii:on = CompilerFlags:ImplicitIntegerdefinition:ON
+          //  can be changed by (maybe dropping $ from lazy syntax while at it)
+          //  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
           */
      }
      function parseExpr() { /* handles precedence climbing for operators */ }
