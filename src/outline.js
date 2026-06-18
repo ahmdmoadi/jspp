@@ -212,6 +212,28 @@ let rel_class = {
      `
 }
 
+let rel_lazy_types = {
+     decl: "lazy int a = 6969;",
+     decl2: "int$ a = 6969;",
+     usageDuh: "a",
+     practical_use: `
+     bool OR(lazy bool a, bool$ b) {
+          return !!a ? a : b;
+     }
+     `,
+     errorwhen: "lazy bool a() {}; //or// lazy bool() a = lazy bool() () {} // ERROR: explicit lazy functions are illegal since functions are lazy in origin!",
+}
+
+let rel_string = {
+     clike: 'char name[] = "myName";',
+     string_type: 'string name = "maename";',
+     empty: 'string bakery; // 1 byte capacity and length (to store nullterm {0})',
+     empty2: 'string bakery = ""; // 1 byte capacity and length (to store nullterm {0})',
+     clike_empty: 'char bakery[] = ""; // 1 byte capacity and length (to store nullterm {0})',
+     clike_empty2: 'char* bakery = ""; // 1 byte capacity and length (to store nullterm {0})',
+     pseudo_methods: 'name.length // equiv to: lazy size_t length = strlen(name);'
+}
+
 let future_bucket_list = {
      "idk": 'int() dbl = await extern "C" int() (x) `int`',
      "async": "await"
