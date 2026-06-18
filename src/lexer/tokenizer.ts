@@ -7,7 +7,8 @@ import {
      VSC_JSPPToken,
      VSC_JSPPTokenType,
      keyword_control_t,
-     storage_type_t
+     storage_type_t,
+     multichar_ops
 } from './tokenizer.types.js';
 
 let accum_logs: any[] = [];
@@ -62,12 +63,24 @@ function tokenize(input: string): JSPPToken[] {
                continue;
           }
 
+          // handle numbers
           if (/^\d/.test(char)) {
                const start = i; 
                const startChar = currentChar;
-               while (i < input.length && /\d|\./.test(input[i])) {
-                    i++;
-                    currentChar++;
+               // while (i < input.length && /\d|\./.test(input[i])) {
+               //      i++;
+               //      currentChar++;
+               // }
+               let hasDot = false;
+               while (i < input.length) {
+               if (/\d/.test(input[i])) {
+                    i++; currentChar++;
+               } else if (input[i] === '.' && !hasDot) {
+                    hasDot = true;
+                    i++; currentChar++;
+               } else {
+                    break;
+               }
                }
                tokens.push({
                     type: "NUMBER",
@@ -77,6 +90,7 @@ function tokenize(input: string): JSPPToken[] {
                });
                continue;
           }
+
           // test for text
           if (/^[a-zA-Z_]/.test(char)) {
                let start = i;
@@ -105,6 +119,7 @@ function tokenize(input: string): JSPPToken[] {
                continue;
           }
 
+          // handle strings
           if (char === '"' || char === "'") {
                const quoteChar = char;
                const start = i;
@@ -202,7 +217,17 @@ function tokenize(input: string): JSPPToken[] {
                
                // If isDivision WAS true, we do absolutely nothing. 
                // The loop will just continue downward and hit your fallback SYMBOL pusher!
-               }
+          }// end regex
+
+
+          // match multi-character operations. (ft. claude sonnet 4.6 medium effort)
+          let matched = multichar_ops.find(op => input.startsWith(op, i)); //FLAG
+          if (matched) {
+               tokens.push({ type: "SYMBOL", text: matched, line: currentLine, char: currentChar });
+               i += matched.length;
+               currentChar += matched.length;
+               continue;
+          }
 
           // catch-all swllowed as symbol
           tokens.push({

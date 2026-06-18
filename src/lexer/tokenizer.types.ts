@@ -7,14 +7,15 @@ export interface JSPPToken {
      char: number;
 }
 
-export class JSPPToken {
-     constructor(type: JSPPTokenType, text: string, line: number, char: number) {
-          this.type = type;
-          this.text = text;
-          this.line = line;
-          this.char = char;
-     }
-}
+// DEPRECATED
+// export class JSPPToken {
+//      constructor(type: JSPPTokenType, text: string, line: number, char: number) {
+//           this.type = type;
+//           this.text = text;
+//           this.line = line;
+//           this.char = char;
+//      }
+// }
 
 // export type VSC_JSPPTokenType = "type" | "storage.type_t" | "keyword.control_t";
 
@@ -49,3 +50,8 @@ export const storage_type_t = [
      "of", "in" // not really but like i dont give a fk about ts anyway, I just want it blue
 ];
 
+export const multichar_ops = [
+    "===","!==","<<=",">>=",   // 3-char first
+    "==","!=",">=","<=","&&","||","++","--",
+    "+=","-=","*=","/=","%=","&=","|=","^=","<<",">>"
+];
