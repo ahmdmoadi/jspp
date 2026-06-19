@@ -1,4 +1,5 @@
 import { tokenize } from '../lexer/tokenizer';
+import { parse } from '../parser/parser';
 
 let input = `/regexp/igmsuy
 
@@ -10,4 +11,4 @@ class Person {
      public string name = "";
 }`;
 
-console.log(`Output:\ns`,tokenize(input));
+console.log(`Output:\ns`,parse(tokenize(input)));

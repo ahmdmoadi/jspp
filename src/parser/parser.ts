@@ -20,14 +20,14 @@ let tokens = tokenize(str)
 
 parse(tokens);
 
-function parse(tokens: JSPPToken[]) {
+export function parse(tokens: JSPPToken[]) {
      let i = 0;
 
      // peek tokens after w/o mutation
      const peek    = (d = 0): JSPPToken => tokens[i + d];
      // consume one token and advance 
      const consume = (): JSPPToken => tokens[i++];
-     // expect X and cry if not X
+     // expect X and complain if not X
      const expect  = (type: JSPPTokenType, text?: string): JSPPToken => {
           const t = consume();
           if (t.type !== type || (text !== undefined && t.text !== text))
@@ -58,6 +58,7 @@ function parse(tokens: JSPPToken[]) {
           int* name = // pointer to integer
           int *name = // == but warn with (-Wstarstruck)
           */
+         return 0;
      }
      function isTypeStart() {
           return base_types.includes(peek().text);
@@ -65,7 +66,6 @@ function parse(tokens: JSPPToken[]) {
      function parseInferredDecl() {
           /*
           - Handeling Inferred Declaration
-          i need to vomit ideas then sort them 🤪
           let a = ""; // primitive string or char[]
           const a = 9; // primitive int
           let a = 9.; // primitive double
@@ -78,13 +78,19 @@ function parse(tokens: JSPPToken[]) {
           //  can be changed by (maybe dropping $ from lazy syntax while at it)
           //  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
           */
+          let accum = "";
+          accum += consume().text;
+          accum += consume().text;
+          accum += consume().text;
+          console.log("found inferred declaration: ", accum);
+          return accum;
      }
-     function parseExpr() { /* handles precedence climbing for operators */ }
-     function parseReturn() {}
-     function parseClass() {}
+     function parseExpr() { /* handles precedence climbing for operators */ return 0; }
+     function parseReturn() { return 0; }
+     function parseClass() { return 0; }
      function parseStatement() {
           // let/var/const path
-          let compounded_or = true;
+          let compounded_or = false;
           for(let inferrer of inferrers) {
                compounded_or ||= at("KEYWORD", inferrer);
           }
@@ -103,6 +109,6 @@ function parse(tokens: JSPPToken[]) {
      }
 
      const ast = [];
-     while (i < tokens.length) ast.push(parseStatement());
+     while (i < tokens.length) ast.push(parseStatement());// parseStatement()
      return ast;
 }
