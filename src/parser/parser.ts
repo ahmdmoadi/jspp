@@ -16,9 +16,9 @@ let ast_tree = {
 
 let base_types = ["int", "char", "float", "float", "double", "void"];
 
-let tokens = tokenize(str)
+// let tokens = tokenize(str);
 
-parse(tokens);
+// parse(tokens);
 
 export function parse(tokens: JSPPToken[]) {
      let i = 0;
@@ -34,7 +34,7 @@ export function parse(tokens: JSPPToken[]) {
                throw new Error(`[${t.line}:${t.char}] Expected ${text ?? type}, got '${t.text}'`);
           return t;
      };
-     // ??
+     // return token exists AND the type is the expected type AND has text
      const at = (type: JSPPTokenType, text?: string, d = 0): boolean => {
           const t = peek(d);
           return !!t && t.type === type && (text === undefined || t.text === text);
@@ -58,6 +58,12 @@ export function parse(tokens: JSPPToken[]) {
           int* name = // pointer to integer
           int *name = // == but warn with (-Wstarstruck)
           */
+         console.log("{parseTypedDecl}");
+         console.log("consumed type: ",consume().text);
+         console.log("consumed iden:", expect("IDENTIFIER").text);
+         console.log("consumed equ:", expect("SYMBOL", "=").text);
+         console.log("consumed expression:", parseExpr("t"));
+         i++;
          return 0;
      }
      function isTypeStart() {
@@ -78,16 +84,27 @@ export function parse(tokens: JSPPToken[]) {
           //  can be changed by (maybe dropping $ from lazy syntax while at it)
           //  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
           */
-          let accum = "";
-          accum += consume().text;
-          accum += consume().text;
-          accum += consume().text;
+          console.log("{parseInferredDecl}");
+          let accum = consume().text; // consume
           console.log("found inferred declaration: ", accum);
           return accum;
+
      }
-     function parseExpr() { /* handles precedence climbing for operators */ return 0; }
-     function parseReturn() { return 0; }
-     function parseClass() { return 0; }
+     function parseExpr(where: string) { /* handles precedence climbing for operators */
+          console.log("{parseExpr}");
+          /*
+           a =|...;|
+          [] => either array definition
+          */
+          if(where === "t") {
+               console.log("[parseExpr] expression is coming from a typed declaration");
+          }
+          return (
+               at("NUMBER")||at("REGEX")||at("STRING")||
+               at("SYMBOL", "[")||at("SYMBOL", "(") ? peek((i - i++)).text: "nothin");
+     }
+     function parseReturn() { console.log("{parseReturn}");return i++; }
+     function parseClass() { console.log("{parseClass}");return i++; }
      function parseStatement() {
           // let/var/const path
           let compounded_or = false;
