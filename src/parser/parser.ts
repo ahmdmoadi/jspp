@@ -23,10 +23,15 @@ let base_types = ["int", "char", "float", "float", "double", "void"];
 export function parse(tokens: JSPPToken[]) {
      let i = 0;
 
+     let lastToken: JSPPToken;
+
      // peek tokens after w/o mutation
      const peek    = (d = 0): JSPPToken => tokens[i + d];
      // consume one token and advance 
-     const consume = (): JSPPToken => tokens[i++];
+     const consume = (): JSPPToken => {
+          lastToken = peek();
+          return tokens[i++]
+     };
      // expect X and complain if not X
      const expect  = (type: JSPPTokenType, text?: string): JSPPToken => {
           const t = consume();
@@ -39,6 +44,76 @@ export function parse(tokens: JSPPToken[]) {
           const t = peek(d);
           return !!t && t.type === type && (text === undefined || t.text === text);
      };
+
+     function consumeStatementEnd() {
+          const current = peek();
+
+          // Condition 1: They actually wrote a semicolon (Good programmer!)
+          if (current.type === "SYMBOL" && current.text === ";") {
+               consume();
+               return;
+          }
+
+          // Condition 2: They pressed Enter!
+          // If the current token is on a HIGHER line number than the last token we ate.
+          if (lastToken && current.line > lastToken.line) {
+               return; // Implicitly accept the end of the statement
+          }
+
+          // Condition 3: We hit a closing brace '}'.
+          // Example: function() { return 5 } <- No semicolon needed before the brace.
+          if (current.type === "SYMBOL" && current.text === "}") {
+               return;
+          }
+
+          // Condition 4: End of File
+          if (!current || current.type === "EOF") { // (Assuming you push an EOF token at the end)
+               return;
+          }
+
+          // If none of these are true, they wrote invalid code (e.g., `let a = 5 let b = 10` on the same line)
+          throw new Error(`Syntax Error: Unexpected token '${current.text}' at line ${current.line}. Expected ';' or a new line.`);
+     }
+
+     enum TypeType {
+          NORMAL, NORMAL_FUNCTION, ANON_FUNCTION, ARRAY, POINTER
+     }
+
+     function parseType() {
+          let dataType = consume().text; 
+          // NORMAL=TYPE IDEN =
+          // Illegal void var
+          if(dataType === "void") {
+               if(at("IDENTIFIER") && at("SYMBOL", "=", 1)) {
+                    throw new Error(`[ERROR][parseType][${peek().line}:${peek().char}] Illegal void variable!`);
+               }
+          }
+          // 3. (Temporary) Check for array brackets if we want to support int[] later
+          // if (at("SYMBOL", "[")) { consume(); expect("SYMBOL", "]"); dataType += "[]"; }
+
+          // 4. Expect the identifier (the variable name)
+          let identifier = expect("IDENTIFIER").text;
+          
+          let value = null;
+
+          // 5. Check for assignment
+          if (at("SYMBOL", "=")) {
+               consume(); // Eat the '='
+               value = parseExpr("typed_decl"); // Grab the value
+          }
+
+          // 6. Ensure the statement safely terminates
+          consumeStatementEnd();
+
+          // 7. Return the structured AST node
+          return {
+               type: "VariableDeclaration",
+               inferred: false,
+               kind: dataType, // e.g., 'int'
+               identifier: identifier,
+               value: value
+          };
+     }
 
      function parseTypedDecl() {
           /* handles int, pointer int, int[], void(), Student[] ... */
@@ -58,13 +133,13 @@ export function parse(tokens: JSPPToken[]) {
           int* name = // pointer to integer
           int *name = // == but warn with (-Wstarstruck)
           */
-         console.log("{parseTypedDecl}");
-         console.log("consumed type: ",consume().text);
-         console.log("consumed iden:", expect("IDENTIFIER").text);
-         console.log("consumed equ:", expect("SYMBOL", "=").text);
-         console.log("consumed expression:", parseExpr("t"));
-         i++;
-         return 0;
+          console.log("{parseTypedDecl}");
+          parseType();
+          while(i < tokens.length && tokens[i].text !== ";") {
+               console.log("Consumed token:", consume().text);
+          }
+          i++;
+          return 0;
      }
      function isTypeStart() {
           return base_types.includes(peek().text);

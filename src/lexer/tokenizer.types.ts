@@ -1,4 +1,4 @@
-export type JSPPTokenType = "KEYWORD" | "NUMBER" | "IDENTIFIER" | "SYMBOL" | "STRING" | "COMMENT" | "REGEX";
+export type JSPPTokenType = "KEYWORD" | "NUMBER" | "IDENTIFIER" | "SYMBOL" | "STRING" | "COMMENT" | "REGEX" | "EOF";
 
 export interface JSPPToken {
      type: JSPPTokenType;
@@ -85,7 +85,7 @@ export const storage_type_t = [
 
 export const multichar_ops = [
     "===","!==","<<=",">>=",   // 3-char first
-    "==","!=",">=","<=","&&","||","++","--",
+    "==","!=",">=","<=","&&","||","++","--","**",
     "+=","-=","*=","/=","%=","&=","|=","^=","<<",">>"
 ];
 

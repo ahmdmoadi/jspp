@@ -1,3 +1,4 @@
+const DEBUG = true;
 import * as fs from 'fs';
 import { 
      JSPPToken,
@@ -67,21 +68,50 @@ function tokenize(input: string): JSPPToken[] {
           if (/^\d/.test(char)) {
                const start = i; 
                const startChar = currentChar;
-               // while (i < input.length && /\d|\./.test(input[i])) {
-               //      i++;
-               //      currentChar++;
-               // }
-               let hasDot = false;
-               while (i < input.length) {
-               if (/\d/.test(input[i])) {
-                    i++; currentChar++;
-               } else if (input[i] === '.' && !hasDot) {
-                    hasDot = true;
-                    i++; currentChar++;
-               } else {
-                    break;
+               
+               // 1. Hexadecimal (0x...)
+               if (char === '0' && i + 1 < input.length && input[i+1].toLowerCase() === 'x') {
+                    i += 2; currentChar += 2; // skip '0x'
+                    while (i < input.length && /[0-9a-fA-F_]/.test(input[i])) {
+                         i++; currentChar++;
+                    }
                }
+               // 2. Octal (0o...)
+               else if (char === '0' && i + 1 < input.length && input[i+1].toLowerCase() === 'o') {
+                    i += 2; currentChar += 2; // skip '0o'
+                    while (i < input.length && /[0-7_]/.test(input[i])) {
+                         i++; currentChar++;
+                    }
                }
+               // 3. Decimal / Float / Double
+               else {
+                    let hasDot = false;
+                    let hasExp = false; // For scientific notation like 1e10
+
+                    while (i < input.length) {
+                         if (/\d_/.test(input[i])) {
+                              i++; currentChar++;
+                         } else if (input[i] === '.' && !hasDot && !hasExp) {
+                              hasDot = true;
+                              i++; currentChar++;
+                         } else if (/[eE]/.test(input[i]) && !hasExp) {
+                              hasExp = true;
+                              i++; currentChar++;
+                              // Allow a + or - right after the 'e'
+                              if (i < input.length && /[+-]/.test(input[i])) {
+                                   i++; currentChar++;
+                              }
+                         } else {
+                              break; // Not part of the decimal!
+                         }
+                    }
+
+                    // Handle your custom 'f' or 'd' suffixes (e.g., 9f, 9.5d)
+                    if (i < input.length && /[fd]/i.test(input[i])) {
+                         i++; currentChar++;
+                    }
+               }
+
                tokens.push({
                     type: "NUMBER",
                     text: input.substring(start, i),
@@ -238,10 +268,16 @@ function tokenize(input: string): JSPPToken[] {
           });
           i++;
           currentChar++;
-     }
-     printlogs();
+     } // HUGE LEXER WHILE LOOP
+     if (DEBUG) printlogs();
+     tokens.push({
+          type: "EOF",
+          text: "EOF",
+          line: currentLine,
+          char: currentChar
+     });
      return tokens;
-}
+} // end of tokenize()
 //FLAG:SEPERATE:0
 import { SemanticTokensBuilder } from 'vscode-languageserver/node';
 
