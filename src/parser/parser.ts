@@ -78,7 +78,8 @@ export function parse(tokens: JSPPToken[], input: string) {
           }
 
           // If none of these are true, they wrote invalid code (e.g., `let a = 5 let b = 10` on the same line)
-          throw new Error(`Syntax Error: Unexpected token '${current.text}' at line ${current.line}. Expected ';' or a new line.`);
+          // throw new Error(`Syntax Error: Unexpected token '${current.text}' at line ${current.line}. Expected ';' or a new line.`);
+          throw new Error(errorPointer(input, current.line, current.char, "consumeStatementEnd", `Syntax Error: Unexpected ${current.type.toLowerCase()} '${current.text}' at line ${current.line}. Expected ';' or a new line.`));
      }
 
      // enum TypeType {
@@ -111,9 +112,38 @@ export function parse(tokens: JSPPToken[], input: string) {
           throw new Error(`[${t.line}:${t.char}] Unexpected token '${t.text}' in expression.`);
      }
 
+     // --- 1.5. Unary & TypeCast Expressions ---
+     function parseUnary(): any {
+          // 1. Detect C-Style Casts: (int) x
+          if (at("SYMBOL", "(") && base_types.includes(peek(1)?.text) && at("SYMBOL", ")", 2)) {
+               consume(); // eat '('
+               const castType = consume().text; // eat 'int'
+               consume(); // eat ')'
+               
+               return {
+                    type: "TypeCastExpr",
+                    targetType: castType,
+                    value: parseUnary() // Recursively call Unary to allow things like (int)-5
+               };
+          }
+
+          // 2. Detect Standard Unary Operators
+          if (at("SYMBOL", "-") || at("SYMBOL", "!") || at("SYMBOL", "++") || at("SYMBOL", "--")) {
+               const operator = consume().text;
+               return {
+                    type: "UnaryExpr",
+                    operator: operator,
+                    value: parseUnary() 
+               };
+          }
+
+          // 3. Fall down to Primary if it's none of the above
+          return parsePrimary();
+     }
+
      // --- 2. Multiplicative (*, /, %, **) ---
      function parseMultiplicative() {
-          let left = parsePrimary();
+          let left = parseUnary();
 
           while (at("SYMBOL", "*") || at("SYMBOL", "/") || at("SYMBOL", "%") || at("SYMBOL", "**")) {
                const operator = consume().text;
@@ -150,7 +180,7 @@ export function parse(tokens: JSPPToken[], input: string) {
      function parseExpr(what: string) {
           console.log(`[INFO][parseExpr] called from ${what}`);
 
-          // parenthesis typecastto_TYPE inferred_decl typed_decl return
+          // parenthesis typecast inferred_decl typed_decl return statement_fallback
           
           // Start at the lowest precedence level you currently support
           return parseAdditive();
@@ -274,13 +304,13 @@ export function parse(tokens: JSPPToken[], input: string) {
      //      const t = consume();
      //      return {type: "Literal", value: t.text}
      // }
-     function parseTypeCast() {
-          console.log(`[INFO][parseTypeCast]`);
-          consume(); // consume (
-          const typeToken = consume();
-          consume(); // consume )
-          return parseExpr(`typecastto_${typeToken.text}`)
-     }
+     // function parseTypeCast() {
+     //      console.log(`[INFO][parseTypeCast]`);
+     //      consume(); // consume (
+     //      const typeToken = consume();
+     //      consume(); // consume )
+     //      return parseExpr(`typecastto_${typeToken.text}`)
+     // }
      function parseReturn() {
           console.log("[INFO][parseReturn]");
 
@@ -289,7 +319,7 @@ export function parse(tokens: JSPPToken[], input: string) {
           let value = null;
 
           // parse expression of return statement
-          while(!at("SYMBOL", ";") && !at("SYMBOL", "}")) {
+          if(!at("SYMBOL", ";") && !at("SYMBOL", "}")) {
                value = parseExpr("return");
           }
 
@@ -318,17 +348,28 @@ export function parse(tokens: JSPPToken[], input: string) {
           if (isTypeStart()) return parseTypedDecl(); // dispatches to var or function
 
           // handle type casting                                      \/ so I can include classes/typedef etc later
-          if(at("SYMBOL", "(") && at("KEYWORD", undefined, 1) && [...base_types].includes(peek(2).text))
-               return parseTypeCast();
+          // if(at("SYMBOL", "(") && at("KEYWORD", undefined, 1) && [...base_types].includes(peek(2).text))
+          //      return parseExpr("typecast");
           
           // throw new Error(`[${peek().line}:${peek().char}] Unexpected '${peek().text}'`);
-          throw new Error(errorPointer(input, peek().line, peek().char, "parseStatement", `Unexpected token '${peek().text}':`));
+          // throw new Error(errorPointer(input, peek().line, peek().char, "parseStatement", `Unexpected token '${peek().text}':`));
+
+          let expr = parseExpr("statement_fallback");
+
+          console.info("[INFO][parseStatement] FELL THROUGH");
+
+          consumeStatementEnd();
+
+          return {
+               type: "ExpressionStatement",
+               expression: expr
+          }
      }
 
      const ast = [];
      while (peek().type !== "EOF") ast.push(parseStatement());// parseStatement()
      return ast;
-}
+} // END parse()
 
 export function errorPointer(
      input: string,
