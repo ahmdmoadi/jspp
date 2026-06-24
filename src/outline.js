@@ -239,6 +239,12 @@ let future_bucket_list = {
      "async": "await"
 }
 
+let misc = `
+// #cf:ii:on = CompilerFlags:ImplicitIntegerdefinition:ON
+//  can be changed by (maybe dropping $ from lazy syntax while at it)
+//  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
+`;
+
 export {
      keywords
 }

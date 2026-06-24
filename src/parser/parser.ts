@@ -80,6 +80,23 @@ export function parse(tokens: JSPPToken[]) {
      }
 
      function parseType() {
+          /* handles int, pointer int, int[], void(), Student[] ... */
+
+          /*
+          - base
+          int name = // integer
+          int() name // alternate function (lambda/anonymous) returning an integer
+          int name( // function returning an integer
+
+          - array related
+          int[] name = // integer array variable
+          int[]() name // alternate function (lambda/anonymous) retuning an integer array
+          int[] name( // function returning an integer array
+
+          - pointers definition
+          int* name = // pointer to integer
+          int *name = // == but warn with (-Wstarstruck)
+          */
           let dataType = consume().text; 
           // NORMAL=TYPE IDEN =
           // Illegal void var
@@ -89,7 +106,11 @@ export function parse(tokens: JSPPToken[]) {
                }
           }
           // 3. (Temporary) Check for array brackets if we want to support int[] later
-          // if (at("SYMBOL", "[")) { consume(); expect("SYMBOL", "]"); dataType += "[]"; }
+          if (at("SYMBOL", "[")) {
+               consume();
+               expect("SYMBOL", "]");
+               dataType += "[]";
+          }
 
           // 4. Expect the identifier (the variable name)
           let identifier = expect("IDENTIFIER").text;
@@ -116,35 +137,12 @@ export function parse(tokens: JSPPToken[]) {
      }
 
      function parseTypedDecl() {
-          /* handles int, pointer int, int[], void(), Student[] ... */
-
-          /*
-          - base
-          int name = // integer
-          int() name // alternate function (lambda/anonymous) returning an integer
-          int name( // function returning an integer
-
-          - array related
-          int[] name = // integer array variable
-          int[]() name // alternate function (lambda/anonymous) retuning an integer array
-          int[] name( // function returning an integer array
-
-          - pointers definition
-          int* name = // pointer to integer
-          int *name = // == but warn with (-Wstarstruck)
-          */
-          console.log("{parseTypedDecl}");
-          parseType();
-          while(i < tokens.length && tokens[i].text !== ";") {
-               console.log("Consumed token:", consume().text);
-          }
-          i++;
-          return 0;
+          console.log("[INFO][parseTypedDecl]");
+          return parseType();
      }
      function isTypeStart() {
           return base_types.includes(peek().text);
      }
-     function parseInferredDecl() {
           /*
           - Handeling Inferred Declaration
           let a = ""; // primitive string or char[]
@@ -153,40 +151,49 @@ export function parse(tokens: JSPPToken[]) {
           let a = 9d; // primitive double
           let a = 9f; // primitive float
           let a = true; // primitive bool
-          let a; // equiv to int a; or maybe should be size_t a?
-          a; // equiv to int a; self defining variables. // will error unless #cf:ii:on; is implied
-          // #cf:ii:on = CompilerFlags:ImplicitIntegerdefinition:ON
-          //  can be changed by (maybe dropping $ from lazy syntax while at it)
-          //  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
+          let a; // equiv to void* a; 8 byte pointer.
           */
-          console.log("{parseInferredDecl}");
-          let accum = consume().text; // consume
-          console.log("found inferred declaration: ", accum);
-          return accum;
+     function parseInferredDecl() {
+          console.log("[INFO][parseInferredDecl]");
+          
+          // 1. Eat the keyword (let, const, var)
+          let declType = consume().text; 
+          
+          // 2. Expect an identifier (the variable name)
+          let identifier = expect("IDENTIFIER").text;
+          
+          let value = null;
 
+          // 3. Check for assignment
+          if (at("SYMBOL", "=")) {
+               consume(); // eat the '='
+               value = parseExpr("inferred_decl"); // grab the value
+          }
+
+          // 4. Ensure the statement safely terminates (; or newline)
+          consumeStatementEnd();
+
+          // 5. Return the Plain Object AST Node
+          return {
+               type: "VariableDeclaration",
+               inferred: true,
+               kind: declType,
+               identifier: identifier,
+               value: value
+          };
      }
      function parseExpr(where: string) { /* handles precedence climbing for operators */
-          console.log("{parseExpr}");
-          /*
-           a =|...;|
-          [] => either array definition
-          */
-          if(where === "t") {
-               console.log("[parseExpr] expression is coming from a typed declaration");
-          }
-          return (
-               at("NUMBER")||at("REGEX")||at("STRING")||
-               at("SYMBOL", "[")||at("SYMBOL", "(") ? peek((i - i++)).text: "nothin");
+          console.log(`[INFO][parseExpr] called from ${where}`);
+          const t = consume();
+          return {type: "Literal", value: t.text}
      }
      function parseReturn() { console.log("{parseReturn}");return i++; }
      function parseClass() { console.log("{parseClass}");return i++; }
      function parseStatement() {
           // let/var/const path
-          let compounded_or = false;
-          for(let inferrer of inferrers) {
-               compounded_or ||= at("KEYWORD", inferrer);
+          if (at("KEYWORD") && inferrers.includes(peek().text)) {
+               return parseInferredDecl();
           }
-          if (compounded_or) return parseInferredDecl();
 
           // return
           if (at("KEYWORD", "return")) return parseReturn();
@@ -201,6 +208,6 @@ export function parse(tokens: JSPPToken[]) {
      }
 
      const ast = [];
-     while (i < tokens.length) ast.push(parseStatement());// parseStatement()
+     while (peek().type !== "EOF") ast.push(parseStatement());// parseStatement()
      return ast;
 }

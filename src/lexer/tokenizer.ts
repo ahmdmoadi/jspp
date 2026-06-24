@@ -89,7 +89,7 @@ function tokenize(input: string): JSPPToken[] {
                     let hasExp = false; // For scientific notation like 1e10
 
                     while (i < input.length) {
-                         if (/\d_/.test(input[i])) {
+                         if (/[\d_]/.test(input[i])) {
                               i++; currentChar++;
                          } else if (input[i] === '.' && !hasDot && !hasExp) {
                               hasDot = true;
