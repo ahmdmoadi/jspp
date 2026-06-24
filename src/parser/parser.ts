@@ -5,6 +5,9 @@ import {
      inferrers
 } from "../lexer/tokenizer.types";
 
+const B = "\x1b[1m";
+const O = "\x1b[0m";
+
 let str = "int a = 1;";
 let currentPath = ["root"];
 let ast_tree = {
@@ -20,19 +23,22 @@ let base_types = ["int", "char", "float", "float", "double", "void"];
 
 // parse(tokens);
 
-export function parse(tokens: JSPPToken[]) {
+export function parse(tokens: JSPPToken[], input: string) {
      let i = 0;
 
      let lastToken: JSPPToken;
+     let prevToken: JSPPToken;
 
      // peek tokens after w/o mutation
      const peek    = (d = 0): JSPPToken => tokens[i + d];
      // consume one token and advance 
      const consume = (): JSPPToken => {
-          lastToken = peek();
-          return tokens[i++]
+          prevToken = i > 1 ? tokens[i-1] : tokens[0];
+          const t = tokens[i++]; // Grab the token and increment 'i' in one step
+          lastToken = t;         // Save it for ASI
+          return t;              // Hand it to the parser
      };
-     // expect X and complain if not X
+     // expect X and complain if not X - MUTATES
      const expect  = (type: JSPPTokenType, text?: string): JSPPToken => {
           const t = consume();
           if (t.type !== type || (text !== undefined && t.text !== text))
@@ -75,8 +81,79 @@ export function parse(tokens: JSPPToken[]) {
           throw new Error(`Syntax Error: Unexpected token '${current.text}' at line ${current.line}. Expected ';' or a new line.`);
      }
 
-     enum TypeType {
-          NORMAL, NORMAL_FUNCTION, ANON_FUNCTION, ARRAY, POINTER
+     // enum TypeType {
+     //      NORMAL, NORMAL_FUNCTION, ANON_FUNCTION, ARRAY, POINTER
+     // }
+
+     // --- 1. Primary Expressions (Numbers, Strings, Identifiers, Regex, Grouping) ---
+     function parsePrimary(): any {
+          const t = consume();
+
+          if (t.type === "NUMBER") {
+               // Safely strip the underscores for the interpreter!
+               return { type: "NumericLiteral", value: parseFloat(t.text.replace(/_/g, "")) };
+          }
+          if (t.type === "IDENTIFIER") {
+               return { type: "Identifier", symbol: t.text };
+          }
+          if (t.type === "STRING") {
+               return { type: "StringLiteral", value: t.text };
+          }
+          if (t.type === "REGEX") {
+               return { type: "RegexLiteral", value: t.text };
+          }
+          if (t.type === "SYMBOL" && t.text === "(") {
+               let value = parseExpr("parenthesis");
+               expect("SYMBOL", ")"); // Eat the closing brace
+               return value;
+          }
+
+          throw new Error(`[${t.line}:${t.char}] Unexpected token '${t.text}' in expression.`);
+     }
+
+     // --- 2. Multiplicative (*, /, %, **) ---
+     function parseMultiplicative() {
+          let left = parsePrimary();
+
+          while (at("SYMBOL", "*") || at("SYMBOL", "/") || at("SYMBOL", "%") || at("SYMBOL", "**")) {
+               const operator = consume().text;
+               const right = parsePrimary();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+
+     // --- 3. Additive (+, -) ---
+     function parseAdditive() {
+          let left = parseMultiplicative();
+
+          while (at("SYMBOL", "+") || at("SYMBOL", "-")) {
+               const operator = consume().text;
+               const right = parseMultiplicative();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+
+     ////////////////////////////////////////////ME SPOT LONG LINE///////////////////////////////////////////////////
+     // --- 4. The Main Expression Router ---
+     function parseExpr(what: string) {
+          console.log(`[INFO][parseExpr] called from ${what}`);
+
+          // parenthesis typecastto_TYPE inferred_decl typed_decl return
+          
+          // Start at the lowest precedence level you currently support
+          return parseAdditive();
      }
 
      function parseType() {
@@ -105,28 +182,38 @@ export function parse(tokens: JSPPToken[]) {
                     throw new Error(`[ERROR][parseType][${peek().line}:${peek().char}] Illegal void variable!`);
                }
           }
-          // 3. (Temporary) Check for array brackets if we want to support int[] later
+          // Check for array brackets if we want to support int[] later
           if (at("SYMBOL", "[")) {
                consume();
                expect("SYMBOL", "]");
                dataType += "[]";
           }
 
-          // 4. Expect the identifier (the variable name)
+          if (at("SYMBOL", "*")) {
+               // see where the star is anchored to, check lastToken.char+lastToken.text.length === current.char
+               let current = consume();
+               console.log(prevToken, current);
+               let attached = prevToken.char+prevToken.text.length === current.char;
+               if(!attached) console.warn(`[WARN][parseType]:${current.line}:${current.char} ${dataType}* IDENTIFIER is preferred over ${dataType} *IDENTIFIER. [-Wstarstruck]`);
+               dataType += "*";
+          }
+
+          // Expect the identifier (the variable name). int >a<
           let identifier = expect("IDENTIFIER").text;
           
+          // VALUE / EXPR ETC FROM BELOW ON
           let value = null;
 
-          // 5. Check for assignment
+          // Check for assignment. int a >=<
           if (at("SYMBOL", "=")) {
                consume(); // Eat the '='
                value = parseExpr("typed_decl"); // Grab the value
           }
 
-          // 6. Ensure the statement safely terminates
+          // Ensure the statement safely terminates
           consumeStatementEnd();
 
-          // 7. Return the structured AST node
+          // Return the structured AST node
           return {
                type: "VariableDeclaration",
                inferred: false,
@@ -143,16 +230,16 @@ export function parse(tokens: JSPPToken[]) {
      function isTypeStart() {
           return base_types.includes(peek().text);
      }
-          /*
-          - Handeling Inferred Declaration
-          let a = ""; // primitive string or char[]
-          const a = 9; // primitive int
-          let a = 9.; // primitive double
-          let a = 9d; // primitive double
-          let a = 9f; // primitive float
-          let a = true; // primitive bool
-          let a; // equiv to void* a; 8 byte pointer.
-          */
+     /*
+     - Handeling Inferred Declaration
+     let a = ""; // primitive string or char[]
+     const a = 9; // primitive int
+     let a = 9.; // primitive double
+     let a = 9d; // primitive double
+     let a = 9f; // primitive float
+     let a = true; // primitive bool
+     let a; // equiv to void* a; 8 byte pointer.
+     */
      function parseInferredDecl() {
           console.log("[INFO][parseInferredDecl]");
           
@@ -182,14 +269,40 @@ export function parse(tokens: JSPPToken[]) {
                value: value
           };
      }
-     function parseExpr(where: string) { /* handles precedence climbing for operators */
-          console.log(`[INFO][parseExpr] called from ${where}`);
-          const t = consume();
-          return {type: "Literal", value: t.text}
+     // function parseExpr(where: string) { /* handles precedence climbing for operators */
+     //      console.log(`[INFO][parseExpr] called from ${where}`);
+     //      const t = consume();
+     //      return {type: "Literal", value: t.text}
+     // }
+     function parseTypeCast() {
+          console.log(`[INFO][parseTypeCast]`);
+          consume(); // consume (
+          const typeToken = consume();
+          consume(); // consume )
+          return parseExpr(`typecastto_${typeToken.text}`)
      }
-     function parseReturn() { console.log("{parseReturn}");return i++; }
+     function parseReturn() {
+          console.log("[INFO][parseReturn]");
+
+          consume(); // consume "return"
+
+          let value = null;
+
+          // parse expression of return statement
+          while(!at("SYMBOL", ";") && !at("SYMBOL", "}")) {
+               value = parseExpr("return");
+          }
+
+          consumeStatementEnd(); // consume ;}EOF
+
+          return {
+               type: "ReturnExpr",
+               value
+          }
+     }
      function parseClass() { console.log("{parseClass}");return i++; }
-     function parseStatement() {
+     ////////////////////////////////////////PARSING ENTRYPOINT//////////////////////////////////////////////
+     function parseStatement() { 
           // let/var/const path
           if (at("KEYWORD") && inferrers.includes(peek().text)) {
                return parseInferredDecl();
@@ -203,11 +316,74 @@ export function parse(tokens: JSPPToken[]) {
 
           // explicit type path: int x ... / void foo() {} / pointer int p ...
           if (isTypeStart()) return parseTypedDecl(); // dispatches to var or function
+
+          // handle type casting                                      \/ so I can include classes/typedef etc later
+          if(at("SYMBOL", "(") && at("KEYWORD", undefined, 1) && [...base_types].includes(peek(2).text))
+               return parseTypeCast();
           
-          throw new Error(`[${peek().line}:${peek().char}] Unexpected '${peek().text}'`);
+          // throw new Error(`[${peek().line}:${peek().char}] Unexpected '${peek().text}'`);
+          throw new Error(errorPointer(input, peek().line, peek().char, "parseStatement", `Unexpected token '${peek().text}':`));
      }
 
      const ast = [];
      while (peek().type !== "EOF") ast.push(parseStatement());// parseStatement()
      return ast;
+}
+
+export function errorPointer(
+     input: string,
+     line: number,
+     index: number,
+     from: string = "GLOBAL",
+     msg: string = "ERROR at:",
+     logtype: string = "ERROR",
+     file: string = "_PARSER_TMP"
+) {
+     // User@DESKTOP-K3M3HOQ MINGW64 ~/Desktop/pro/js-interpreter/debug
+     // $ gcc afile.c -Wall
+     // afile.c: In function 'main':
+     // afile.c:4:10: warning: unused variable 'unUseD' [-Wunused-variable]
+     // 4 |      int unUseD = 0;
+     //      |          ^~~~~~
+     return `[${logtype}][${from}]:\n`
+          +`${B}${file}:${O} In function ${B}'${from}${O}':\n`
+          +`${B}${file}:${line}:${index}:${O} ${msg}\n`
+          +`${" ".repeat(5-line.toString().length)}${line} | ${getLine(input,line)}\n`
+          +`      | ${" ".repeat(index)}^`;
+}
+
+function getLine(input: string, line: number) {
+     return input.split("\n")[line];
+}
+
+function reconstruct_input(tokens: JSPPToken[]): string {
+     // let attached = prevToken.char+prevToken.text.length === current.char;
+     if(!tokens || tokens.length === 0) return "";
+
+     let accum = "";
+     let currentLine = tokens[0].line;
+     let pointer = tokens[0].char;
+
+     for(let i = 0; i < tokens.length; i++) {
+          let current = tokens[i];
+
+          if (current.type === "EOF") continue;
+
+          // handle newlines
+          if(currentLine < current.line) {
+               let lineDiff = current.line - currentLine;
+               accum += "\n".repeat(lineDiff);
+               currentLine = current.line;
+               pointer = 0;
+          }
+
+          // handle spaces
+          let spaceCount = current.char - pointer;
+          if (spaceCount > 0) accum += " ".repeat(spaceCount);
+
+          accum += current.text;
+
+          pointer = current.char + current.text.length;
+     }
+     return accum;
 }

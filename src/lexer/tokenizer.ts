@@ -14,7 +14,7 @@ import {
 
 let accum_logs: any[] = [];
 
-function tokenize(input: string): JSPPToken[] {
+function tokenize(input: string): {tokens: JSPPToken[], input: string} {
 
      accum_logs = []; // empty debug arr
 
@@ -276,13 +276,16 @@ function tokenize(input: string): JSPPToken[] {
           line: currentLine,
           char: currentChar
      });
-     return tokens;
+     return {
+          tokens,
+          input
+     };
 } // end of tokenize()
 //FLAG:SEPERATE:0
 import { SemanticTokensBuilder } from 'vscode-languageserver/node';
 
 export function build_vscode_tokens(input: string) {
-     const tokens = tokenize(input);
+     const tokens = tokenize(input).tokens;
      const builder = new SemanticTokensBuilder();
 
      // --- PASS 1: Build the Symbol Table (Cache) ---
