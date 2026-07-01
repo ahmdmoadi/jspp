@@ -65,7 +65,9 @@ export const keywords = [
      "async",
      "await",
      "lazy",
-     "defer"
+     "defer",
+     "typedef",
+     "type"
 ];
 
 export const keyword_control_t = [
@@ -84,7 +86,7 @@ export const storage_type_t = [
 ];
 
 export const multichar_ops = [
-    "===","!==","<<=",">>=",   // 3-char first
+    "===","!==","<<=",">>=","<<<",">>>",   // 3-char first
     "==","!=",">=","<=","&&","||","++","--","**",
     "+=","-=","*=","/=","%=","&=","|=","^=","<<",">>"
 ];

@@ -1,3 +1,4 @@
+# "sitting on the computer 24/7 like he is recreating the atom" -"Him"
 # mista zozen
 
 ### inferred/dynamic variables

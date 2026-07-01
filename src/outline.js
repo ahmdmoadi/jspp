@@ -243,6 +243,17 @@ let misc = `
 // #cf:ii:on = CompilerFlags:ImplicitIntegerdefinition:ON
 //  can be changed by (maybe dropping $ from lazy syntax while at it)
 //  and doing: s$on;s$bool #cfii:on;a;++a;++a;return,a*sizeof(&a);$sss:bool;b;!b;return,b;
+
+/*
+     - Handeling Inferred Declaration
+     let a = ""; // primitive string or char[]
+     const a = 9; // primitive int
+     let a = 9.; // primitive double
+     let a = 9d; // primitive double
+     let a = 9f; // primitive float
+     let a = true; // primitive bool
+     let a; // equiv to void* a; 8 byte pointer.
+     */
 `;
 
 export {

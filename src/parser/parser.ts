@@ -1,3 +1,5 @@
+const DEBUG = true;
+
 import { tokenize } from "../lexer/tokenizer";
 import {
      JSPPToken,
@@ -23,11 +25,27 @@ let base_types = ["int", "char", "float", "float", "double", "void"];
 
 // parse(tokens);
 
-export function parse(tokens: JSPPToken[], input: string) {
+export function parse(tokens: JSPPToken[], input: string): any {
      let i = 0;
 
      let lastToken: JSPPToken;
      let prevToken: JSPPToken;
+
+     let knownClasses: string[] = [];
+     // prescan for classes
+     let ii = 0;
+     let typeCreators = ["class", "type"]; // will probably get replaced soon with parseClass?
+     while(ii < tokens.length) {
+          let current = tokens[ii];
+          let next = ((ii+1) >= tokens.length) ? null : tokens[ii+1];
+          if(current.type === "KEYWORD" && typeCreators.includes(current.text)) {
+               if(next) {
+                    if(next.type === "IDENTIFIER") knownClasses.push(next.text);
+                    else throw new SyntaxError(errorPointer(input, next.line, next.char, "CLASS_PRESCAN", "Error: invalid identifier!"));
+               } else throw new SyntaxError(errorPointer(input, current.line, current.char+current.text.length, "CLASS_PRESCAN", "Error: missing type operand!"));
+          }
+          ii++;
+     }
 
      // peek tokens after w/o mutation
      const peek    = (d = 0): JSPPToken => tokens[i + d];
@@ -42,7 +60,8 @@ export function parse(tokens: JSPPToken[], input: string) {
      const expect  = (type: JSPPTokenType, text?: string): JSPPToken => {
           const t = consume();
           if (t.type !== type || (text !== undefined && t.text !== text))
-               throw new Error(`[${t.line}:${t.char}] Expected ${text ?? type}, got '${t.text}'`);
+               // throw new Error(`[${t.line}:${t.char}] Expected ${text ?? type}, got '${t.text}'`);
+               throw new Error(errorPointer(input, t.line, t.char, "expect", `Expected ${text ?? type}, got '${t.text}'`));
           return t;
      };
      // return token exists AND the type is the expected type AND has text
@@ -108,11 +127,21 @@ export function parse(tokens: JSPPToken[], input: string) {
                expect("SYMBOL", ")"); // Eat the closing brace
                return value;
           }
+          // Arrays and Array Comprehensions!
+          if (t.type === "SYMBOL" && t.text === "[") {
+               return parseArray();
+          }
 
-          throw new Error(`[${t.line}:${t.char}] Unexpected token '${t.text}' in expression.`);
+          // Object Literals! (For later)
+          if (t.type === "SYMBOL" && t.text === "{") {
+               return parseObject();
+          }
+
+          // throw new Error(`[${t.line}:${t.char}] Unexpected token '${t.text}' in expression.`);
+          throw new Error(errorPointer(input, t.line, t.char, "parsePrimary", `Unexpected token '${t.text}' in expression.`));
      }
 
-     // --- 1.5. Unary & TypeCast Expressions ---
+     // --- 1.5. Unary & TypeCast Expressions --- PASS TO parsePrimary
      function parseUnary(): any {
           // 1. Detect C-Style Casts: (int) x
           if (at("SYMBOL", "(") && base_types.includes(peek(1)?.text) && at("SYMBOL", ")", 2)) {
@@ -141,7 +170,7 @@ export function parse(tokens: JSPPToken[], input: string) {
           return parsePrimary();
      }
 
-     // --- 2. Multiplicative (*, /, %, **) ---
+     // --- 2. Multiplicative (*, /, %, **) --- PASS TO parseUnary
      function parseMultiplicative() {
           let left = parseUnary();
 
@@ -158,7 +187,7 @@ export function parse(tokens: JSPPToken[], input: string) {
           return left;
      }
 
-     // --- 3. Additive (+, -) ---
+     // --- 3. Additive (+, -) --- PASS TO passMultiplicative
      function parseAdditive() {
           let left = parseMultiplicative();
 
@@ -175,15 +204,95 @@ export function parse(tokens: JSPPToken[], input: string) {
           return left;
      }
 
+     function parseShift() {
+          let left: any = parseAdditive();
+
+          while (at("SYMBOL", "<<") || at("SYMBOL", ">>") || at("SYMBOL", "<<<") || at("SYMBOL", ">>>")) {
+               const operator = consume().text;
+               const right = parseAdditive();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+     function parseRelational() {
+          let left: any = parseShift();
+
+          while (at("SYMBOL", "<") || at("SYMBOL", ">") || at("SYMBOL", "<=") || at("SYMBOL", ">=")) {
+               const operator = consume().text;
+               const right = parseShift();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+     function parseEquality() {
+          let left: any = parseRelational();
+
+          while (at("SYMBOL", "==") || at("SYMBOL", "===") || at("SYMBOL", "!=") || at("SYMBOL", "!==")) {
+               const operator = consume().text;
+               const right = parseRelational();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+     function parseLogical() {
+          let left: any = parseEquality();
+
+          while (at("SYMBOL", "&&") || at("SYMBOL", "||")) {
+               const operator = consume().text;
+               const right = parseEquality();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+     function parseAssignment() {
+          let left = parseLogical();
+
+          while (
+               at("SYMBOL", "=") || at("SYMBOL", "+=") || at("SYMBOL", "-+") || at("SYMBOL", "*=") ||
+               at("SYMBOL", "/=") || at("SYMBOL", "%=") || at("SYMBOL", "&=") || at("SYMBOL", "|=") ||
+               at("SYMBOL", "^=") || at("SYMBOL", "<<=") || at("SYMBOL", ">>=")
+          ) {
+               const operator = consume().text;
+               const right = parseLogical();
+               left = {
+                    type: "BinaryExpr",
+                    operator: operator,
+                    left: left,
+                    right: right
+               };
+          }
+          return left;
+     }
+
      ////////////////////////////////////////////ME SPOT LONG LINE///////////////////////////////////////////////////
      // --- 4. The Main Expression Router ---
      function parseExpr(what: string) {
-          console.log(`[INFO][parseExpr] called from ${what}`);
+          if (DEBUG) console.log(`[INFO][parseExpr] called from ${what}`);
 
           // parenthesis typecast inferred_decl typed_decl return statement_fallback
           
           // Start at the lowest precedence level you currently support
-          return parseAdditive();
+          return parseAssignment();
      }
 
      function parseType() {
@@ -254,22 +363,12 @@ export function parse(tokens: JSPPToken[], input: string) {
      }
 
      function parseTypedDecl() {
-          console.log("[INFO][parseTypedDecl]");
+          if (DEBUG) console.log("[INFO][parseTypedDecl]");
           return parseType();
      }
      function isTypeStart() {
-          return base_types.includes(peek().text);
+          return [...base_types, ...knownClasses].includes(peek().text);
      }
-     /*
-     - Handeling Inferred Declaration
-     let a = ""; // primitive string or char[]
-     const a = 9; // primitive int
-     let a = 9.; // primitive double
-     let a = 9d; // primitive double
-     let a = 9f; // primitive float
-     let a = true; // primitive bool
-     let a; // equiv to void* a; 8 byte pointer.
-     */
      function parseInferredDecl() {
           console.log("[INFO][parseInferredDecl]");
           
@@ -299,18 +398,6 @@ export function parse(tokens: JSPPToken[], input: string) {
                value: value
           };
      }
-     // function parseExpr(where: string) { /* handles precedence climbing for operators */
-     //      console.log(`[INFO][parseExpr] called from ${where}`);
-     //      const t = consume();
-     //      return {type: "Literal", value: t.text}
-     // }
-     // function parseTypeCast() {
-     //      console.log(`[INFO][parseTypeCast]`);
-     //      consume(); // consume (
-     //      const typeToken = consume();
-     //      consume(); // consume )
-     //      return parseExpr(`typecastto_${typeToken.text}`)
-     // }
      function parseReturn() {
           console.log("[INFO][parseReturn]");
 
@@ -330,7 +417,22 @@ export function parse(tokens: JSPPToken[], input: string) {
                value
           }
      }
-     function parseClass() { console.log("{parseClass}");return i++; }
+     function parseClass() { // placeholder FLAG
+          if(DEBUG) console.log("[INFO][parseClass]");
+          consume(); // consume "class"
+          let iden = expect("IDENTIFIER");
+          consumeStatementEnd();
+          return {
+               type: "ClassDef",
+               value: iden.text // do I replace this with..what
+          }
+     }
+     function parseArray() {
+          if(DEBUG) console.log("[INFO][parseArray]");
+     }
+     function parseObject() {
+
+     }
      ////////////////////////////////////////PARSING ENTRYPOINT//////////////////////////////////////////////
      function parseStatement() { 
           // let/var/const path
@@ -347,12 +449,18 @@ export function parse(tokens: JSPPToken[], input: string) {
           // explicit type path: int x ... / void foo() {} / pointer int p ...
           if (isTypeStart()) return parseTypedDecl(); // dispatches to var or function
 
-          // handle type casting                                      \/ so I can include classes/typedef etc later
-          // if(at("SYMBOL", "(") && at("KEYWORD", undefined, 1) && [...base_types].includes(peek(2).text))
-          //      return parseExpr("typecast");
-          
-          // throw new Error(`[${peek().line}:${peek().char}] Unexpected '${peek().text}'`);
-          // throw new Error(errorPointer(input, peek().line, peek().char, "parseStatement", `Unexpected token '${peek().text}':`));
+          // let sample = {
+          //      "type": "MethodCallExpr",
+          //      "object": { "type": "Identifier", "symbol": "a" },
+          //      "method": "length",
+          //      "args": []
+          // }
+
+          // if(at("IDENTIFIER")) {
+          //      return {
+          //           type: ""
+          //      }
+          // }
 
           let expr = parseExpr("statement_fallback");
 
@@ -366,8 +474,15 @@ export function parse(tokens: JSPPToken[], input: string) {
           }
      }
 
-     const ast = [];
-     while (peek().type !== "EOF") ast.push(parseStatement());// parseStatement()
+     interface TMP {
+          type: string,
+          body: any[]
+     }
+     const ast: TMP = {
+          type: "Program",
+          body: []
+     };
+     while (peek().type !== "EOF") ast.body.push(parseStatement());// parseStatement()
      return ast;
 } // END parse()
 
